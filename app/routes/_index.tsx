@@ -92,7 +92,7 @@ export default function Index() {
   }, [monaco, editorTheme]);
 
   return (
-    <>
+    <div className="h-screen flex flex-col">
       <nav>
         <div className="container py-8 h-10 flex flex-row items-center justify-between">
           <Link to="/" className="font-bold text-lg mx-4">
@@ -135,7 +135,7 @@ export default function Index() {
           </DropdownMenu>
         </div>
       </nav>
-      <div className="container h-screen">
+      <div className="flex-1 container">
         <Tabs
           className="h-full flex flex-col"
           value={tab}
@@ -215,6 +215,6 @@ export default function Index() {
           </TabsContent>
         </Tabs>
       </div>
-    </>
+    </div>
   );
 }
