@@ -5,7 +5,10 @@ import { useMonaco } from '~/hooks/useMonaco';
 export interface EditorProps {
   className?: string;
   model: Monaco.editor.ITextModel;
-  options?: Omit<Monaco.editor.IStandaloneEditorConstructionOptions, 'model'>;
+  options?: Omit<
+    Monaco.editor.IStandaloneEditorConstructionOptions,
+    'model' | 'theme'
+  >;
 }
 
 export function Editor({ className, model, options }: EditorProps) {
@@ -19,7 +22,9 @@ export function Editor({ className, model, options }: EditorProps) {
         lineNumbersMinChars: 0,
         model,
       });
-      return () => editor.dispose();
+      return () => {
+        editor.dispose();
+      };
     }
   }, [monaco, model, editorDiv]);
 
