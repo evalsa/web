@@ -5,6 +5,7 @@ import { useMonaco } from './useMonaco';
 export function useEditorModel() {
   const monaco = useMonaco();
   const [model, setModel] = useState<Monaco.editor.ITextModel>();
+  const [language, setLanguage] = useState<string>('');
   useEffect(() => {
     if (monaco) {
       const model = monaco.editor.createModel('');
@@ -13,10 +14,11 @@ export function useEditorModel() {
     }
   }, [monaco]);
 
-  const setLanguage = (language: string) => {
-    if (monaco && model) {
+  useEffect(() => {
+    if (monaco && model && language) {
       monaco.editor.setModelLanguage(model, language);
     }
-  };
-  return [model, setLanguage] as const;
+  }, [monaco, model, language]);
+
+  return [model, language, setLanguage] as const;
 }

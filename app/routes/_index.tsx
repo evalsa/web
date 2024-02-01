@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { useEditorModel } from '~/hooks/useEditorModel';
 import { Editor } from '~/components/Editor';
 import { Button } from '~/components/ui/button';
-import { requestRun } from '~/api/requestRun';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -23,7 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
-import { Laptop, Moon, Play, Sun } from 'lucide-react';
+import { Laptop, Moon, Sun } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -33,6 +32,7 @@ import {
 } from '~/components/ui/sheet';
 import { useMonaco } from '~/hooks/useMonaco';
 import { Link } from '@remix-run/react';
+import * as cbor from 'cbor-x';
 
 export const meta: MetaFunction = () => {
   return [
@@ -43,23 +43,36 @@ export const meta: MetaFunction = () => {
 
 export default function Index() {
   const monaco = useMonaco();
-  const [sourceModel, setSourceLanguage] = useEditorModel();
+  const [sourceModel, language, setSourceLanguage] = useEditorModel();
   const [inputModel] = useEditorModel();
   const [output, setOutput] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [tab, setTab] = useState<string>('src');
   const [theme, setTheme] = useState<string>();
   const [editorTheme, setEditorTheme] = useState<string>();
+  const [websocket, setWebsocket] = useState<WebSocket>();
 
   const onRun = () => {
     if (!(sourceModel && inputModel)) return;
     setTab('result');
     const source = sourceModel.getValue();
     const stdin = inputModel.getValue();
-    requestRun(source, stdin).then(({ stdout, stderr }) => {
-      setOutput(stdout);
-      setError(stderr);
+    const encoder = new TextEncoder();
+    const body = cbor.encode({
+      language,
+      code: encoder.encode(source),
+      stdin: encoder.encode(stdin),
     });
+    fetch('http://localhost:4000/run', {
+      method: 'POST',
+      body,
+    })
+      .then((r) => r.text())
+      .then((id) => {
+        const ws = new WebSocket(`ws://localhost:4000/notify/${id}`);
+
+        setWebsocket(ws);
+      });
   };
 
   useLayoutEffect(() => {
@@ -74,6 +87,31 @@ export default function Index() {
     setTheme(theme);
     setEditorTheme(editorTheme);
   }, []);
+
+  useEffect(() => {
+    if (websocket) {
+      websocket.addEventListener('message', async (message) => {
+        const buffer = new Uint8Array(await message.data.arrayBuffer());
+        const data = cbor.decode(buffer);
+        if (data.state.Finished) {
+          const decoder = new TextDecoder();
+          const output = decoder.decode(
+            new Uint8Array(data.state.Finished.stdout),
+          );
+          const error = decoder.decode(
+            new Uint8Array(data.state.Finished.stderr),
+          );
+          setOutput(output);
+          setError(error);
+        }
+      });
+      return () => websocket.close();
+    }
+  }, [websocket]);
+
+  useEffect(() => {
+    setSourceLanguage(language);
+  }, [language]);
 
   useEffect(() => {
     theme && window.localStorage.setItem('theme', theme);
@@ -144,7 +182,7 @@ export default function Index() {
           <div className="flex flex-row justify-between">
             <TabsList>
               <TabsTrigger className="p-0" value="src">
-                <Select onValueChange={setSourceLanguage}>
+                <Select value={language} onValueChange={setSourceLanguage}>
                   <SelectTrigger className="py-0 h-8 border-none [[data-state=inactive]_&]:pointer-events-none [[data-state=inactive]_&]:bg-muted">
                     <SelectValue placeholder="Language..." />
                   </SelectTrigger>
